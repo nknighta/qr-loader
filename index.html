@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket Manager</title>
+    <meta name="description" content="QR Code Reader" />
+    <script src="./jsQR.js"></script>
+</head>
+
+<body>
+    <div>
+    </div>
+    <video style="width: 100%; position: fixed; z-index: -10;"></video>
+    <div id="qrdisplaycontainer">
+        <h1>QR Code Reader</h1>
+        <div id="result" style="min-height: 20px;"></div>
+        <div id="status" style="min-height: 20px;"></div>
+        <div id="multidisplay"></div>
+        <div style="display: flex; justify-content: center; ">
+        </div>
+        <div id="overlay" style="position: fixed;border: 2px solid #F00;"></div>
+    </div>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+    </style>
+    <script>
+        const multidisplay = document.querySelector('#multidisplay');
+        const script = document.createElement('div');
+        script.textContent = "GASデータロード中...";
+        document.body.appendChild(script);
+        // GAS_API_URL
+        let userdata = [];
+        fetch('https://script.google.com/macros/s/AKfycbxYcjBwLQTAhalZFqi85jdJCeFrw6fh5W1vxfMUMnfXk55n-0J-Ojijwt8nozgcU_Bm/exec')
+            .then(response => response.text())
+            .then(text => {
+                script.textContent = text;
+                //document.body.appendChild(script);
+                document.body.appendChild(script);
+                console.log(text);
+                userdata = JSON.parse(text);
+                return userdata;
+            }).catch(error => {
+                script.textContent = "ロードエラー: Google にログインしているか確認してください。";
+                document.body.appendChild(script);
+            })
+
+        const newDiv = document.createElement('div');
+        //newDiv.textContent = userdata || 'loading...';
+        newDiv.textContent = "sss";
+        multidisplay.appendChild(newDiv);
+        const constraints = {
+            audio: false,
+            video: {
+                facingMode: 'environment',
+                width: 900,
+                height: 900,
+            }
+        };
+
+        const drawRect = (topLeft, bottomRight) => {
+            const { x: x1, y: y1 } = topLeft;
+            const { x: x2, y: y2 } = bottomRight;
+
+            const overlay = document.querySelector('#overlay');
+            overlay.style.position = 'fixed';
+            overlay.style.left = `${x1 * 1.6}px`;
+            overlay.style.top = `${y1 * 1.3}px`;
+            overlay.style.width = `${x2}px`;
+            overlay.style.height = `${y2}px`;
+        };
+
+        (async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.querySelector('video');
+                video.srcObject = stream;
+                video.play();
+
+                const { width, height } = constraints.video;
+                const canvas = new OffscreenCanvas(width, height);
+                const context = canvas.getContext('2d');
+                document.querySelector('#status').textContent = '';
+                const timer = setInterval(() => {
+                    context.drawImage(video, 0, 0, width, height);
+                    const imageData = context.getImageData(0, 0, width, height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    document.querySelector('#status').textContent = '';
+                    if (code) {
+                        document.querySelector('#status').textContent = '';
+                        document.querySelector('#result').textContent = code.data;
+                        drawRect(code.location.topLeftCorner, code.location.bottomRightCorner);
+                        document.querySelector('#status').textContent = 'OK';
+                        video.pause();
+                        setTimeout(() => {
+                            video.play();
+                        }, 100);
+                    } else {
+                        document.querySelector('#result').textContent = 'QRコードを表示してください。';
+                        drawRect({ x: 0, y: 0 }, { x: 0, y: 0 });
+                    }
+                }, 20);
+            } catch (error) {
+                console.log('load error', error);
+            }
+        })();
+    </script>
+</body>
+
+</html>
